@@ -1,0 +1,2 @@
+if (!!!templates) var templates = {};
+templates["sample"] = new Hogan.Template({code: function (c,p,i) { var t=this;t.b(i=i||"");t.b("<div>");t.b("\n" + i);t.b(" ");t.b(t.v(t.f("data",c,p,0)));t.b("\n" + i);t.b("</div>");return t.fl(); },partials: {}, subs: {  }});

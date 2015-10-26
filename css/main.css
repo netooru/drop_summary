@@ -1,0 +1,21 @@
+.main__content{
+    min-width: 400px;
+    width: 40%;
+}
+.summary_data__header{
+    position: relative;
+}
+.header__summary_tabs__tab:nth-child(n+4){
+    display: none;
+}
+.summary_data__header__item_panel_btn--show,
+.summary_data__header__item_panel_btn--hide{
+    padding: 5px;
+    position: absolute;
+    right: 10px;
+    top: 7px;
+    
+}
+.summary_data__header__item_panel_btn--hide{
+   opacity:0;
+}

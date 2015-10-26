@@ -1,0 +1,97 @@
+<html>
+  <head>
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script type="text/javascript" src="./js/jquery-2.1.4.min.js" ></script>
+    <script type="text/javascript">
+        google.load("visualization", "1");
+        function getSpreadSheetData(sheetName, query, callback) {
+            var queryString = encodeURIComponent(query);
+            var query = new google.visualization.Query(
+                'https://docs.google.com/spreadsheets/d/1smgr3ac_mdauXSSVc27RaHVFlzQkI40fZSWXzxLiu30/gviz/tq?headers=1&sheet=' + sheetName + '&tq=' + queryString);
+            return query.send(callback);
+        }
+  
+        function getItemMaster() {
+            getSpreadSheetData('itemMaster', 'SELECT A, B, C, D', parseItemMaster);   
+        }
+  
+        var itemMaster = {};
+        function parseItemMaster(response) {
+            console.dir(response);
+            if (response.isError()) {
+              alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+              return;
+            }
+            var data = response.getDataTable();
+            console.dir(data);
+            for (var rowIndex = 0; rowIndex < data.getNumberOfRows(); rowIndex++) {
+                var itemTypeId = data.getFormattedValue(rowIndex, 0);
+                if (itemMaster[itemTypeId] === undefined) {
+                        itemMaster[itemTypeId] = {
+                            itemTypeId:itemTypeId,
+                            itemTypeName:data.getFormattedValue(rowIndex, 1),
+                            itemRanks:[]
+                        };
+                }
+                var row = {};
+                for (var colIndex = 0; colIndex < data.getNumberOfColumns(); colIndex++) {
+                    row[data.getColumnLabel(colIndex)] = data.getFormattedValue(rowIndex, colIndex);   
+                }
+                itemMaster[itemTypeId].itemRanks.push(row);
+            }
+            console.dir(itemMaster);
+        }
+    $(window).on('beforeunload', function() {
+        return 'before unload!';
+    }).on('unload', function(){
+        return 'unload!';
+    });
+
+        function drawGID() {
+                var queryString = encodeURIComponent('SELECT A');
+            var sheetName = "area_json";
+  
+            var query = new google.visualization.Query(
+                'https://docs.google.com/spreadsheets/d/1smgr3ac_mdauXSSVc27RaHVFlzQkI40fZSWXzxLiu30/gviz/tq?tq=' + queryString);
+            query.send(handleQueryResponse);
+        }
+  
+        function handleQueryResponse(response) {
+          if (response.isError()) {
+            alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+            return;
+          }
+  
+          var data = response.getDataTable();
+          console.dir(data);
+          var dataList = [];
+          for (var row = 0; row < data.getNumberOfRows(); row++)
+          {
+            var line = {};
+            for (var col = 0; col < data.getNumberOfColumns(); col++) {
+              line[data.getColumnLabel(col)] = data.getFormattedValue(row, col);
+            }
+            dataList.unshift(line);
+          }
+          console.dir(dataList);
+        }
+        google.setOnLoadCallback(getItemMaster);
+        var fs = WScript.CreateObject("Scripting.FileSystemObject");
+        var file = fs.CreateTextFile("text.txt");
+        file.write("hogehgoe");
+        file.Close();
+    </script>
+  </head>
+  <body>
+    <div id="authorize-div" style="display: none">
+      <span>Authorize access to Google Apps Script Execution API</span>
+      <!--Button for the user to click to initiate auth sequence -->
+      <button id="authorize-button" onclick="handleAuthClick(event)">
+        Authorize
+      </button>
+    </div>
+    <pre id="output"></pre>
+    <div id="chart_div"></div>
+  </body>
+</html>
+

@@ -1,0 +1,35 @@
+{{#area}}
+    {{#stageList}}
+    <article class="content__summary_data tab-pane fade panel panel-default" id="{{areaId}}--{{stageId}}">
+        <header class="summary_data__header panel-heading">
+            {{name}}&nbsp;{{stageId}}
+            {{ ! TODO: customize drop item
+            <button type="button" class="summary_data__header__item_panel_btn--show btn btn-primary btn-lg active fa fa-plus"></button>
+            <button type="button" class="summary_data__header__item_panel_btn--hide btn btn-primary btn-lg active fa fa-times"></button>
+            }}
+        </header>
+        <section class="summary_data__content">
+            <table class="summary_data__content__data_table table">
+                <tr>
+                        <th>Name</th>
+                        <th>Percent</th>
+                        <th>Btn</th>
+                </tr>
+                {{#dropItems}}
+                <tr class="data_table__row--{{itemId}}">
+                        <td class="data_table__row__name">{{name}}</td>
+                        <td class="data_table__row__persent">0%</td>
+                        <td class="data_table__row__btns">
+                            <div class="btn-group data_table__btns" role="group" aria-label="...">
+                                <button type="button" class="btn btn-default fa fa-plus data_table__btns__btn--plus" data-stage-id="{{areaId}}--{{stageId}}" data-item-id="{{itemId}}"></button>
+                                <button type="button" class="btn btn-default fa fa-minus data_table__btns__btn--minus" data-stage-id="{{areaId}}--{{stageId}}" data-item-id="{{itemId}}"/></button>
+                            </div>
+                            <input type="hidden" class="data_table__count" value="0">
+                        </td>
+                </tr>
+                {{/dropItems}}
+            </table>
+        </section>
+    </article>
+    {{/stageList}}
+{{/area}}

@@ -1,0 +1,21 @@
+                            <table class="summary_data__content__data_table table">
+                                <tr>
+                                        <th>Name</th>
+                                        <th>Percent</th>
+                                        <th>Btn</th>
+                                </tr>
+                                {{#items}}
+                                <tr class="data_table__row--{{id}}">
+                                        <td>{{name}}</td>
+                                        <td>{{persent}}%</td>
+                                        <td>
+                                            <div class="btn-group data_table__btns" role="group" aria-label="...">
+                                                <button type="button" class="btn btn-default fa fa-plus data_table__btns__btn--plus"></button>
+                                                <button type="button" class="btn btn-default fa fa-minus data_table__btns__btn--minus"/></button>
+                                            </div>
+                                            <input type="hidden" class="data_table__count" value="{{count}}">
+
+                                        </td>
+                                </tr>
+                                {{/items}}
+                            </table>

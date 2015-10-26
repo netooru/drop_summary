@@ -1,0 +1,21 @@
+{{#area}}
+    {{#stageList}}
+    <li id="tab_{{areaId}}--{{stageId}}" class="header__summary_tabs__tab"><a href="#{{areaId}}--{{stageId}}" data-toggle="tab" data-tab-target="{{areaId}}--{{stageId}}">{{name}} {{stageId}}<span class="badge"></span></a></li>
+    {{/stageList}}
+{{/area}}
+<li class="dropdown">
+    <a href="#" class="dropdown-toggle" data-toggle="dropdown">ドロップダウンメニュー ▼</a>
+    <ul class="dropdown-menu" role="menu" aria-labelledby="dropdownMenu">
+        <li>
+            <div class="row-fluid">
+                <ul class="unstyled span6">
+                    {{#area}}
+                        {{#stageList}}
+                        <li id="dropdown_{{areaId}}--{{stageId}}"><a href="#{{areaId}}--{{stageId}}" data-toggle="tab">{{name}} {{stageId}}</a></li>
+                        {{/stageList}}
+                    {{/area}}
+                </ul>
+           </div>
+        </li>
+    </ul>
+</li>
