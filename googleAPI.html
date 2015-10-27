@@ -4,82 +4,164 @@
     <script type="text/javascript" src="./js/jquery-2.1.4.min.js" ></script>
     <script type="text/javascript">
         google.load("visualization", "1");
-        function getSpreadSheetData(sheetName, query, callback) {
+
+        /**
+         * GoogleSpreadSheetのデータを取得するラッパ関数
+         *
+         * @param {String} sheetName シート名
+         * @param {String} query spreadSheet検索クエリ
+         * @param {Function} callback Callback関数
+         *
+         */
+        function getSpreadSheetData(sheetName, query, callback)
+        {
             var queryString = encodeURIComponent(query);
             var query = new google.visualization.Query(
                 'https://docs.google.com/spreadsheets/d/1smgr3ac_mdauXSSVc27RaHVFlzQkI40fZSWXzxLiu30/gviz/tq?headers=1&sheet=' + sheetName + '&tq=' + queryString);
-            return query.send(callback);
+
+            var callbackWrapper = getSpreadSheetDataCallbackWrapper(sheetName, callback);
+
+            query.send(callbackWrapper);
+        }
+
+        /**
+         * エラーハンドリングとdeferredを制御するラッパー関数を返す
+         *
+         * @param {String} sheetName シート名
+         * @param {Function} callback コールバック関数
+         * 
+         * @return {Function}
+         *
+         */
+        function getSpreadSheetDataCallbackWrapper(sheetName, callback)
+        {
+            var callbackWrapper = function(response)
+            {
+                var deferred = deferreds[sheetName] === undefined ? new $.Deferred() : deferreds[sheetName];
+                if (response.isError())
+                {
+                    alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+                    deferred.reject();
+                } else 
+                {
+                    callback(response);
+                    deferred.resolve();
+                }
+                return deferred.promise();
+            };
+            return callbackWrapper;
+        }
+
+        var deferreds   = 
+        {
+            itemMaster  : undefined,
+            stageMaster : undefined,
+            dropList    : undefined
+        };
+        var itemMaster  = {};
+        var stageMaster = {};
+        var dropList    = {};
+  
+        /**
+         * itemMasterシートの情報を取得して変数`itemMaster`に格納する
+         */
+        function getItemMaster()
+        {
+            getSpreadSheetData('itemMaster', 'SELECT A, B, C, D WHERE A is not null and A != ""', parseItemMaster);
         }
   
-        function getItemMaster() {
-            getSpreadSheetData('itemMaster', 'SELECT A, B, C, D', parseItemMaster);   
+        /**
+         * stageMasterシートの情報を取得して変数`stageMaster`に格納する
+         */
+        function getStageMaster()
+        {
+            getSpreadSheetData('stageMaster', 'SELECT A, B, C, D WHERE A is not null and A != ""', parseStageMaster);
         }
   
-        var itemMaster = {};
-        function parseItemMaster(response) {
-            console.dir(response);
-            if (response.isError()) {
-              alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
-              return;
+        /**
+         * dropListシートの情報を取得して変数`dropList`に格納する
+         */
+        function getDropList()
+        {
+            getSpreadSheetData('dropList', 'SELECT A, B, C, D WHERE A is not null and A != ""', parseDropList);
+        }
+
+        function convertDataTableToArray(dataTable)
+        {
+            var dataTableArray = [];
+            for (var rowIndex = 0; rowIndex < dataTable.getNumberOfRows(); rowIndex++ ) {
+                var row = {};
+                for (var colIndex = 0; colIndex < dataTable.getNumberOfColumns(); colIndex++) {
+                    row[dataTable.getColumnLabel(colIndex)] = dataTable.getFormattedValue(rowIndex, colIndex);
+                }
+                dataTableArray.push(row);
             }
+            return dataTableArray;
+        }
+
+        function parseStageMaster(response)
+        {
             var data = response.getDataTable();
             console.dir(data);
-            for (var rowIndex = 0; rowIndex < data.getNumberOfRows(); rowIndex++) {
+            console.log("resolve stageMaster");
+            stageMaster = convertDataTableToArray(data);
+        }
+  
+        function parseDropList(response)
+        {
+            deferreds.stageMaster.done(function()
+            {
+                console.log("after stageMaster");
+                var data = response.getDataTable();
+                console.dir(data);
+                dropList = convertDataTableToArray(data);
+            });
+        }
+  
+        function parseItemMaster(response)
+        {
+            console.dir(response);
+            var data = response.getDataTable();
+            console.dir(data);
+            for (var rowIndex = 0; rowIndex < data.getNumberOfRows(); rowIndex++)
+            {
                 var itemTypeId = data.getFormattedValue(rowIndex, 0);
-                if (itemMaster[itemTypeId] === undefined) {
-                        itemMaster[itemTypeId] = {
+                if (itemMaster[itemTypeId] === undefined)
+                {
+                        itemMaster[itemTypeId] =
+                        {
                             itemTypeId:itemTypeId,
                             itemTypeName:data.getFormattedValue(rowIndex, 1),
                             itemRanks:[]
                         };
                 }
                 var row = {};
-                for (var colIndex = 0; colIndex < data.getNumberOfColumns(); colIndex++) {
+                for (var colIndex = 0; colIndex < data.getNumberOfColumns(); colIndex++)
+                {
                     row[data.getColumnLabel(colIndex)] = data.getFormattedValue(rowIndex, colIndex);   
                 }
                 itemMaster[itemTypeId].itemRanks.push(row);
             }
             console.dir(itemMaster);
         }
-    $(window).on('beforeunload', function() {
-        return 'before unload!';
-    }).on('unload', function(){
-        return 'unload!';
-    });
 
-        function drawGID() {
-                var queryString = encodeURIComponent('SELECT A');
-            var sheetName = "area_json";
-  
-            var query = new google.visualization.Query(
-                'https://docs.google.com/spreadsheets/d/1smgr3ac_mdauXSSVc27RaHVFlzQkI40fZSWXzxLiu30/gviz/tq?tq=' + queryString);
-            query.send(handleQueryResponse);
+        function init()
+        {
+            // Deferredリストを初期化
+            Object.keys(deferreds).forEach(function(key){
+                deferreds[key] = new $.Deferred();
+            });
         }
-  
-        function handleQueryResponse(response) {
-          if (response.isError()) {
-            alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
-            return;
-          }
-  
-          var data = response.getDataTable();
-          console.dir(data);
-          var dataList = [];
-          for (var row = 0; row < data.getNumberOfRows(); row++)
-          {
-            var line = {};
-            for (var col = 0; col < data.getNumberOfColumns(); col++) {
-              line[data.getColumnLabel(col)] = data.getFormattedValue(row, col);
-            }
-            dataList.unshift(line);
-          }
-          console.dir(dataList);
+
+        function main() 
+        {
+            init();
+            getItemMaster();
+            getStageMaster();
+            getDropList();
         }
-        google.setOnLoadCallback(getItemMaster);
-        var fs = WScript.CreateObject("Scripting.FileSystemObject");
-        var file = fs.CreateTextFile("text.txt");
-        file.write("hogehgoe");
-        file.Close();
+        google.setOnLoadCallback(main);
+
     </script>
   </head>
   <body>
