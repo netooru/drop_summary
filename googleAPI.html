@@ -86,6 +86,12 @@
             getSpreadSheetData('dropList', 'SELECT A, B, C, D WHERE A is not null and A != ""', parseDropList);
         }
 
+        /**
+         * SpreadSheetのDataTableを{columnLavel:cellValue,...}の配列に変換する
+         * @param {Object} dataTable response.getDataTable()
+         *
+         * @return {Array} [{columnLavel:cellValue,...},...]
+         */
         function convertDataTableToArray(dataTable)
         {
             var dataTableArray = [];
@@ -122,26 +128,21 @@
         {
             console.dir(response);
             var data = response.getDataTable();
-            console.dir(data);
-            for (var rowIndex = 0; rowIndex < data.getNumberOfRows(); rowIndex++)
+            var itemMasterData = convertDataTableToArray(data);
+            $(itemMasterData).each(function()
             {
-                var itemTypeId = data.getFormattedValue(rowIndex, 0);
-                if (itemMaster[itemTypeId] === undefined)
-                {
-                        itemMaster[itemTypeId] =
-                        {
-                            itemTypeId:itemTypeId,
-                            itemTypeName:data.getFormattedValue(rowIndex, 1),
-                            itemRanks:[]
-                        };
+                var item = this;
+                var itemTypeId = item.itemTypeId;
+                if (itemMaster[itemTypeId] === undefined) {
+                    itemMaster[itemTypeId] =
+                    {
+                        itemTypeId:itemTypeId,
+                        itemTypeName:item.itemTypeName,
+                        itemRanks:[]
+                    };
                 }
-                var row = {};
-                for (var colIndex = 0; colIndex < data.getNumberOfColumns(); colIndex++)
-                {
-                    row[data.getColumnLabel(colIndex)] = data.getFormattedValue(rowIndex, colIndex);   
-                }
-                itemMaster[itemTypeId].itemRanks.push(row);
-            }
+                itemMaster[itemTypeId].itemRanks.push(item);
+            });
             console.dir(itemMaster);
         }
 
