@@ -52,15 +52,26 @@
             return callbackWrapper;
         }
 
+        /**
+         * deferred一覧
+         */
         var deferreds   = 
         {
             itemMaster  : undefined,
             stageMaster : undefined,
             dropList    : undefined
         };
-        var itemMaster  = {};
-        var stageMaster = {};
-        var dropList    = {};
+
+        /**
+         * SpreadSheetの実データ
+         */
+        var spreadSheetData = {
+            itemMaster : {},
+            stageMaster : {},
+            dropList : {}
+        };
+
+        var stageData = {};
   
         /**
          * itemMasterシートの情報を取得して変数`itemMaster`に格納する
@@ -110,7 +121,11 @@
             var data = response.getDataTable();
             console.dir(data);
             console.log("resolve stageMaster");
-            stageMaster = convertDataTableToArray(data);
+            spreadSheetData.stageMaster = convertDataTableToArray(data);
+            spreadSheetData.stageMaster.forEach(function(stage)
+            {
+                stageData[stage.stageId] = stage;
+            });
         }
   
         function parseDropList(response)
@@ -120,7 +135,17 @@
                 console.log("after stageMaster");
                 var data = response.getDataTable();
                 console.dir(data);
-                dropList = convertDataTableToArray(data);
+                spreadSheetData.dropList = convertDataTableToArray(data);
+                spreadSheetData.dropList.forEach(function(item)
+                {
+                    var stage = stageData[item.stageId]
+                    if (stage !== undefined) {
+                        if (stage['items'] === undefined) {
+                            stage['items'] = [];
+                        }
+                        stage.items.push(item);
+                    }
+                });
             });
         }
   
@@ -133,17 +158,17 @@
             {
                 var item = this;
                 var itemTypeId = item.itemTypeId;
-                if (itemMaster[itemTypeId] === undefined) {
-                    itemMaster[itemTypeId] =
+                if (spreadSheetData.itemMaster[itemTypeId] === undefined) {
+                    spreadSheetData.itemMaster[itemTypeId] =
                     {
                         itemTypeId:itemTypeId,
                         itemTypeName:item.itemTypeName,
                         itemRanks:[]
                     };
                 }
-                itemMaster[itemTypeId].itemRanks.push(item);
+                spreadSheetData.itemMaster[itemTypeId].itemRanks.push(item);
             });
-            console.dir(itemMaster);
+            console.dir(spreadSheetData.itemMaster);
         }
 
         function init()

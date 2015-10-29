@@ -1,12 +1,4 @@
 jQuery(function ($) {
-    $(document).on('click', '.add-list-button', function() {
-            var item_data = {
-                    index:getContentListRows().size(),
-                    item:$(this).attr('data-item-name')
-            };
-            addItemList([item_data]);
-            saveItemList();
-    });
     $(document)
             .on('click', '.data_table__btns__btn--plus', function() {
                 addDropData($(this).attr('data-stage-id'), $(this).attr('data-item-id'));
@@ -18,11 +10,7 @@ jQuery(function ($) {
             })
     ;
     $(document).on('ready', function() {
-        loadSummaryMaster().done(function() {
-            renderFrame();
-            renderDropSummary();
-            renderDonutChart();
-        });
+        main();
     });
     $(document).on('shown.bs.tab', 'a[data-toggle="tab"]', function (e) {
       var activatedTab = e.target // activated tab
@@ -47,149 +35,180 @@ jQuery(function ($) {
     const CACHE_KEY_DROP_SUMMARY = "drop_summary";
     const CACHE_KEY_TAB_HISTORY  = "tab_history";
 
-    /*
-     * MasterDataを取得する
-     * */
-    function loadSummaryMaster() {
-        var xhr = $.ajax({
-            type: 'GET',
-            url: '/data/summary_master.json',
-            dataType: 'json',
-            success: function(json){
-                areaMaster = json.area;
-                houguMaster = json.hougu;
-                hiyakuMaster = json.hiyaku;
-                commonMaster = json.common;
+    /**
+     * GoogleSpreadSheetのデータを取得するラッパ関数
+     *
+     * @param {String} sheetName シート名
+     * @param {String} query spreadSheet検索クエリ
+     * @param {Function} callback Callback関数
+     *
+     */
+    function getSpreadSheetData(sheetName, query, callback)
+    {
+        var queryString = encodeURIComponent(query);
+        var query = new google.visualization.Query(
+            'https://docs.google.com/spreadsheets/d/1smgr3ac_mdauXSSVc27RaHVFlzQkI40fZSWXzxLiu30/gviz/tq?headers=1&sheet=' + sheetName + '&tq=' + queryString);
 
-                parseAreaMaster();
-            },
-            complete : function(){
-              console.log('complete');
+        var callbackWrapper = getSpreadSheetDataCallbackWrapper(sheetName, callback);
+
+        query.send(callbackWrapper);
+    }
+
+    /**
+     * エラーハンドリングとdeferredを制御するラッパー関数を返す
+     *
+     * @param {String} sheetName シート名
+     * @param {Function} callback コールバック関数
+     * 
+     * @return {Function}
+     *
+     */
+    function getSpreadSheetDataCallbackWrapper(sheetName, callback)
+    {
+        var callbackWrapper = function(response)
+        {
+            var deferred = deferreds[sheetName] === undefined ? new $.Deferred() : deferreds[sheetName];
+            if (response.isError())
+            {
+                alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+                deferred.reject();
+            } else 
+            {
+                callback(response);
+                deferred.resolve();
             }
+            return deferred.promise();
+        };
+        return callbackWrapper;
+    }
+
+    /**
+     * deferred一覧
+     */
+    var deferreds   = 
+    {
+        stageMaster : undefined,
+        dropList    : undefined
+    };
+
+    /**
+     * SpreadSheetの実データ
+     */
+    var spreadSheetData = {
+        stageMaster : {},
+        dropList : {}
+    };
+
+    var stageData = {};
+  
+    /**
+     * stageMasterシートの情報を取得して変数`stageMaster`に格納する
+     */
+    function getStageMaster()
+    {
+        getSpreadSheetData('stageMaster', 'SELECT A, B, C, D WHERE A is not null and A != ""', parseStageMaster);
+    }
+  
+    /**
+     * dropListシートの情報を取得して変数`dropList`に格納する
+     */
+    function getDropList()
+    {
+        getSpreadSheetData('dropList', 'SELECT A, B, C, D WHERE A is not null and A != ""', parseDropList);
+    }
+
+    /**
+     * SpreadSheetのDataTableを{columnLavel:cellValue,...}の配列に変換する
+     * @param {Object} dataTable response.getDataTable()
+     *
+     * @return {Array} [{columnLavel:cellValue,...},...]
+     */
+    function convertDataTableToArray(dataTable)
+    {
+        var dataTableArray = [];
+        for (var rowIndex = 0; rowIndex < dataTable.getNumberOfRows(); rowIndex++ ) {
+            var row = {};
+            for (var colIndex = 0; colIndex < dataTable.getNumberOfColumns(); colIndex++) {
+                row[dataTable.getColumnLabel(colIndex)] = dataTable.getFormattedValue(rowIndex, colIndex);
+            }
+            dataTableArray.push(row);
+        }
+        return dataTableArray;
+    }
+
+    function parseStageMaster(response)
+    {
+        var data = response.getDataTable();
+        console.dir(data);
+        console.log("resolve stageMaster");
+        spreadSheetData.stageMaster = convertDataTableToArray(data);
+        spreadSheetData.stageMaster.forEach(function(stage)
+        {
+            stageData[stage.stageId] = stage;
         });
-        return xhr;
     }
-
-    /*
-     * AreaMasterを解析
-     *
-     * */
-    function parseAreaMaster() {
-        for (var areaMasterIndex = 0; areaMasterIndex < areaMaster.length; areaMasterIndex++) {
-            var area = areaMaster[areaMasterIndex];
-            parseAreaData(area);
-        }
-    }
-
-    /*
-     * Areaデータを解析
-     *
-     * */
-    function parseAreaData(area) {
-        for (var stageListIndex = 0; stageListIndex < area.stageList.length; stageListIndex++) {
-            var stage = area.stageList[stageListIndex];
-            parseStageData(stage);
-        }
-    }
-
-    /*
-     * stageデータを解析
-     * */
-    function parseStageData(stage) {
-        for (var dropItemIndex = 0; dropItemIndex < stage.dropItems.length; dropItemIndex++) {
-            var dropItem = stage.dropItems[dropItemIndex];
-            parseDropItemData(dropItem);
-        }
-    }
-
-    /*
-     * dropItemのデータを解析
-     * IDを元にitemMasterからデータを引っ張ってくる。
-     * */
-    function parseDropItemData(dropItem) {
-        var itemData = getItemMasterData(dropItem.itemId);
-        if (itemData !== false) {
-            $.extend(dropItem, itemData);
-            if (dropItem.num > 1) {
-                dropItem.name += '×' + dropItem.num;
-            }
-        }
-    }
-
-    /*
-     * AreaIDを元にAreaDataを取得する
-     * */
-    function getAreaMasterData(areaId) {
-        for (var areaIndex = 0; areaIndex < areaMaster.length; areaIndex++) {
-            var area = areaMaster[areaIndex];
-            if (area.id === areaId) {
-                return area;
-            }
-        }
-        return false;
-    }
-
-    /*
-     * AreaIDとStageIDを元にStageDataを取得する
-     * */
-    function getStageMasterData(areaId, stageId) {
-        var area = getAreaMasterData(areaId);
-        if (area !== false) {
-            var stageMaster = area.stageList;
-            for (var stageIndex = 0; stageIndex < stageMaster.length; stageIndex++) {
-                var stage = stageMaster[stageIndex];
-                if (stage.stageId === stageId) {
-                    return stage;
-                }
-            }
-        }
-        return false;
-    }
-
-    /*
-     * ItemIDを元にItemDataを取得する
-     * */
-    function getItemMasterData(itemId) {
-        var itemIdMatch = itemId.match(/^((\w+)_\w+)(?:-(\d+))?/);
-        if (itemIdMatch === null) {
-            return false;
-        }
-        var itemTypeId = itemIdMatch[1];
-        var itemIdPrefix = itemIdMatch[2];
-        var itemRank = itemIdMatch[3];
-        var itemMaster = [];
-        if (itemIdPrefix === HOUGU_ID_PREFIX) {
-            itemMaster = houguMaster;
-        } else if (itemIdPrefix === HIYAKU_ID_PREFIX) {
-            itemMaster = hiyakuMaster;
-        } else if (itemIdPrefix === COMMON_ID_PREFIX) {
-            itemMaster = commonMaster;
-        }
-        for (var itemMasterIndex = 0; itemMasterIndex < itemMaster.length; itemMasterIndex++) {
-            var item = itemMaster[itemMasterIndex];
-            if (item.itemTypeId === itemTypeId) {
-                if (itemRank === undefined) {
-                    return item;
-                } else {
-                    for (var itemRankIndex = 0; itemRankIndex < item.ranks.length; itemRankIndex++) {
-                        var rank = item.ranks[itemRankIndex];
-                        if (rank.rank === Number(itemRank)) {
-                            return rank;
-                        }
+  
+    function parseDropList(response)
+    {
+        deferreds.stageMaster.done(function()
+        {
+            console.log("after stageMaster");
+            var data = response.getDataTable();
+            console.dir(data);
+            spreadSheetData.dropList = convertDataTableToArray(data);
+            spreadSheetData.dropList.forEach(function(item)
+            {
+                var stage = stageData[item.stageId]
+                if (stage !== undefined) {
+                    if (stage['items'] === undefined) {
+                        stage['items'] = [];
                     }
+                    stage.items.push(item);
                 }
-                break;
-            }
-        }
-        return false;
+            });
+        });
     }
 
-    /*
-     * MasterDataを元にHTMLをレンダリングする
-     * */
-    function renderFrame() {
-        $('.header__summary_tabs').append(templates['summary_header_tab'].render({area:areaMaster}));
-        $('.main__content').append(templates['summary_data_frame'].render({area:areaMaster}));
+    function init()
+    {
+        // Deferredリストを初期化
+        Object.keys(deferreds).forEach(function(key){
+            deferreds[key] = new $.Deferred();
+        });
+    }
+
+    function main() 
+    {
+        init();
+        getStageMaster();
+        getDropList();
+        deferreds.dropList.done(function()
+                {
+                    console.log("start render");
+                    renderSummaryHeaderTab();
+                    renderSummaryDataFrame();
+                    renderDropSummary();
+                });
+    }
+
+    function renderSummaryHeaderTab() 
+    {
+        var stageList = [];
+        Object.keys(stageData).forEach(function(key)
+                {
+                    stageList.push(stageData[key]);
+                });
+        $('.header__summary_tabs').html(templates["summary_header_tab"].render({stageList:stageList}));
+    }
+
+    function renderSummaryDataFrame()
+    {
+        var stageList = [];
+        Object.keys(stageData).forEach(function(key)
+                {
+                    stageList.push(stageData[key]);
+                });
+        $('.main__content').html(templates["summary_data_frame"].render({stageList:stageList}));
     }
 
     /*
@@ -248,7 +267,8 @@ jQuery(function ($) {
         Object.keys(typeSummary).forEach(function(type) {
             outerGraphData.push([type, typeSummary[type].count]);
             Object.keys(typeSummary[type].items).forEach(function(itemId) {
-                innerGraphData.push([getItemMasterData(itemId).name, typeSummary[type].items[itemId]]);
+                //innerGraphData.push([getItemMasterData(itemId).name, typeSummary[type].items[itemId]]);
+                innerGraphData.push([type, typeSummary[type].items[itemId]]);
             });
         });
         console.dir(outerGraphData);
@@ -256,7 +276,8 @@ jQuery(function ($) {
         var s1 = [['a',6], ['b',8], ['c',14], ['d',20]];
         var s2 = [['a', 8], ['b', 12], ['c', 6], ['d', 9]];
          
-        var plot3 = $.jqplot('chart', [outerGraphData, innerGraphData], {
+        // var plot3 = $.jqplot('chart', [outerGraphData, innerGraphData], {
+        var plot3 = $.jqplot('chart', [s1, s2], {
             seriesDefaults: {
               // make this a donut chart.
               renderer:$.jqplot.DonutRenderer,
@@ -395,9 +416,4 @@ jQuery(function ($) {
     function setLocalStorageData(key, value) {
         localStorage[key] = value;
     }
-
-
-
-    loadSummaryMaster();
-
 
