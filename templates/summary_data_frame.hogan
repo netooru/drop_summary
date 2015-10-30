@@ -15,7 +15,7 @@
                     <th>Btn</th>
             </tr>
             {{#items}}
-            <tr class="data_table__row--{{itemId}}">
+            <tr class="data_table__row" data-item-id="{{itemId}}" data-item-name="{{itemName}}">
                     <td class="data_table__row__name">{{itemName}}</td>
                     <td class="data_table__row__persent">0%</td>
                     <td class="data_table__row__btns">

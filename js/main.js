@@ -2,11 +2,11 @@ jQuery(function ($) {
     $(document)
             .on('click', '.data_table__btns__btn--plus', function() {
                 addDropData($(this).attr('data-stage-id'), $(this).attr('data-item-id'));
-                renderDonutChart();
+                renderSummaryChart();
             })
             .on('click', '.data_table__btns__btn--minus', function() {
                 removeDropData($(this).attr('data-stage-id'), $(this).attr('data-item-id'));
-                renderDonutChart();
+                renderSummaryChart();
             })
     ;
     $(document).on('ready', function() {
@@ -19,7 +19,7 @@ jQuery(function ($) {
       addTabHistory(activatedTab.hash.replace(/^#/,''));
       $('.header__summary_tabs__tab').removeClass('active');
       $(activatedTabId).addClass('active').prependTo('.header__summary_tabs');
-      renderDonutChart();
+      renderSummaryChart();
       // 処理,,,,,
     });
 });
@@ -234,48 +234,43 @@ jQuery(function ($) {
             Object.keys(dropSummary).forEach(function(itemId) {
                 var count = dropSummary[itemId];
                 var persent = ((count / dropCount) * 100).toFixed(4);
-                $(['#', stageId, ' .data_table__row--', itemId, ' .data_table__row__persent'].join('')).html(persent+'%');
+                $(['#', stageId, ' .data_table__row[data-item-id="', itemId, '"] .data_table__row__persent'].join('')).html(persent+'%');
+                $(['#', stageId, ' .data_table__row[data-item-id="', itemId, '"] .data_table__count'].join('')).val(count);
             });
             console.dir(dropSummary);
         });
     }
 
+    function callbackTest(a,b,c,d,e) {
+        console.dir(a,b,c,d,e);
+    }
+
+    function renderSummaryChart()
+    {
+        var dropSummaryList = [];
+        var typeSummaryList = [];
+        var typeSummary = {};
+        $('.content__summary_data:visible .summary_data__content__data_table tr.data_table__row').each(function()
+        {
+          var itemName = $(this).attr('data-item-name');
+          var itemId = $(this).attr('data-item-id');
+          var itemType = itemId.match(/^(\w+)_/)[1];
+          var count = Number($('.data_table__count', this).val());
+          dropSummaryList.push([itemId, count]);
+          typeSummary[itemType] = typeSummary[itemType] === undefined ? 0 : typeSummary[itemType];
+          typeSummary[itemType] += Number(count);
+        });
+        typeSummaryList = Object.keys(typeSummary).map(function(key)
+        {
+          return [key, typeSummary[key]];
+        });
+        renderDonutChart(dropSummaryList, typeSummaryList);        
+    }
+
     /*
      * グラフ描画
      * */
-    function renderDonutChart() {
-        var dropList = getStageCacheData($('.content__summary_data:visible').attr("id")).dropList;
-        var typeSummary = {};
-        for (var dropListIndex = 0; dropListIndex < dropList.length; dropListIndex++) {
-            var dropItem = dropList[dropListIndex];
-            var typeMatch = dropItem.match(/^(\w+?)_/);
-            if (typeMatch !== undefined) {
-                var type = typeMatch[1];
-                if (typeSummary[type] === undefined) {
-                    typeSummary[type] = {count:0, items:{}};
-                }
-                typeSummary[type].count++;
-                if(typeSummary[type].items[dropItem] === undefined){
-                    typeSummary[type].items[dropItem] = 0;
-                }
-                typeSummary[type].items[dropItem]++;
-            }
-        }
-        console.dir(typeSummary);
-        var outerGraphData = [];
-        var innerGraphData = [];
-        Object.keys(typeSummary).forEach(function(type) {
-            outerGraphData.push([type, typeSummary[type].count]);
-            Object.keys(typeSummary[type].items).forEach(function(itemId) {
-                //innerGraphData.push([getItemMasterData(itemId).name, typeSummary[type].items[itemId]]);
-                innerGraphData.push([type, typeSummary[type].items[itemId]]);
-            });
-        });
-        console.dir(outerGraphData);
-        console.dir(innerGraphData);
-        var s1 = [['a',6], ['b',8], ['c',14], ['d',20]];
-        var s2 = [['a', 8], ['b', 12], ['c', 6], ['d', 9]];
-         
+    function renderDonutChart(s1, s2) {
         // var plot3 = $.jqplot('chart', [outerGraphData, innerGraphData], {
         var plot3 = $.jqplot('chart', [s1, s2], {
             seriesDefaults: {
