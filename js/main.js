@@ -412,3 +412,38 @@ jQuery(function ($) {
         localStorage[key] = value;
     }
 
+    function setSpreadSheetData(key, value)
+    {
+        execGoogleScriptApi('add', key, value, 'callbackTest');
+    }
+
+    function execGoogleScriptApi(_cmd, _key, _value, _callback){
+        var debugUrl = 'https://script.google.com/macros/s/AKfycbxtoFZwp3jfe0m1vC4sZoo0PWbO3RfH4Nc558uiy0c/dev';
+        var url = 'https://script.google.com/macros/s/AKfycbyfrwrsLaib98BKPOmR3bhpEk6swOMmLC60nfExWcv9VM6574c/exec';
+        url = debugUrl;
+        var param = {
+            cmd:_cmd,
+            key:_key,
+            value:_value
+        };
+        var xhr = execAjax(url, 'POST', param, 'jsonp', _callback);
+        return xhr;
+    }
+
+    function execAjax(_url, _method, _param, _dataType, _callback, _doneCallback, _failCallback, _completeCallback){
+        var method = _method !== undefined ? _method : 'GET';
+        var param = _param !== undefined ? _param : {};
+        var dataType = _dataType !== undefined ? _dataType : 'text';
+        // TODO: crossDomainでは強制的にGETリクエストになってしまう。
+        var xhr = $.ajax({
+            url : _url,
+            type : method,
+            data : param,
+            dataType : dataType,
+            jsonpCallback : _callback
+        })
+        .done(_doneCallback)
+        .fail(_failCallback)
+        .complete(_completeCallback);
+        return xhr;
+    }
