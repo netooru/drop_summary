@@ -27,6 +27,7 @@ jQuery(function ($) {
     var areaMaster = [];
     var houguMaster = [];
     var hiyakuMaster = [];
+    var gasToken = undefined;
 
     const HOUGU_ID_PREFIX = 'ho';
     const HIYAKU_ID_PREFIX = 'hi';
@@ -34,6 +35,9 @@ jQuery(function ($) {
 
     const CACHE_KEY_DROP_SUMMARY = "drop_summary";
     const CACHE_KEY_TAB_HISTORY  = "tab_history";
+
+    const GAS_TOKEN_API = 'https://script.google.com/macros/s/AKfycbyfrwrsLaib98BKPOmR3bhpEk6swOMmLC60nfExWcv9VM6574c/exec?cmd=getToken&key=&value=&debug=gubed';
+    const GAS_REST_API = 'https://script.googleapis.com/v1/scripts/MA-BRnDQLnU0rXFYL_yztuEGWDuh-bkVU:run';
 
     /**
      * GoogleSpreadSheetのデータを取得するラッパ関数
@@ -346,6 +350,14 @@ jQuery(function ($) {
         return false;
     }
 
+    function getGASToken() {
+        var doneCallback = function(json) {
+            gasToken = json.token;
+        };
+        var xhr = execAjax(GAS_TOKEN_API, 'GET',undefined,undefined,'jsonp',undefined,doneCallback);
+        return xhr;
+    }
+
     function getStageCacheData(stageId) {
         var cacheData = getCacheData(CACHE_KEY_DROP_SUMMARY);
         if (cacheData[stageId] === undefined) {
@@ -412,38 +424,70 @@ jQuery(function ($) {
         localStorage[key] = value;
     }
 
-    function setSpreadSheetData(key, value)
+    function addSpreadSheetData(key, value)
     {
-        execGoogleScriptApi('add', key, value, 'callbackTest');
+        var param = [key, value];
+        execGoogleScriptApi('addSummaryData', param, 2);
     }
 
-    function execGoogleScriptApi(_cmd, _key, _value, _callback){
+    function removeSpreadSheetData(key, value)
+    {
+        var param = [key, value];
+        execGoogleScriptApi('removeSummaryData', param, 2);
+    }
+
+    function execGoogleScriptApi(_cmd, _param, _retryableNum){
         var debugUrl = 'https://script.google.com/macros/s/AKfycbxtoFZwp3jfe0m1vC4sZoo0PWbO3RfH4Nc558uiy0c/dev';
         var url = 'https://script.google.com/macros/s/AKfycbyfrwrsLaib98BKPOmR3bhpEk6swOMmLC60nfExWcv9VM6574c/exec';
-        url = debugUrl;
+        url = 'https://script.googleapis.com/v1/scripts/MA-BRnDQLnU0rXFYL_yztuEGWDuh-bkVU:run';
+        var retryableNum = _retryableNum !== undefined ? _retryableNum : 0;
+        //url = debugUrl;
         var param = {
-            cmd:_cmd,
-            key:_key,
-            value:_value
+            function: _cmd,
+            parameters:_param,
+            devMode: true
         };
-        var xhr = execAjax(url, 'POST', param, 'jsonp', _callback);
+        var doneCallback = function(a, b, c, d, e) {
+            // TODO:実装
+            console.log("done!");
+            console.dir([a,b,c,d,e]);
+        };
+        var failCallback = function(a, b, c) {
+            // TODO:初回はToken未取得なので必ずエラーになる
+            // undefinedの場合は取得しに行く様にする。（もしくはDocument.readyでやっとく）
+            console.log("fail...");
+            console.dir([a,b,c,retryableNum]);
+            if (retryableNum > 0) {
+                retryableNum--;
+                getGASToken().done(function(){
+                    execGoogleScriptApi(_cmd, _param, retryableNum);
+                });
+            }
+        };
+        var headers = {
+            Authorization : "Bearer " + gasToken
+        };
+        var xhr = execAjax(url, 'POST', JSON.stringify(param), 'application/json', 'json', headers, doneCallback, failCallback);
         return xhr;
     }
 
-    function execAjax(_url, _method, _param, _dataType, _callback, _doneCallback, _failCallback, _completeCallback){
+    function execAjax(_url, _method, _param, _contentType, _dataType, _headers, _doneCallback, _failCallback, _completeCallback){
         var method = _method !== undefined ? _method : 'GET';
         var param = _param !== undefined ? _param : {};
         var dataType = _dataType !== undefined ? _dataType : 'text';
-        // TODO: crossDomainでは強制的にGETリクエストになってしまう。
+        var contentType = _contentType !== undefined ? _contentType : 'application/x-www-form-urlencoded';
         var xhr = $.ajax({
             url : _url,
+            contentType : contentType,
+            crossDomain : true,
             type : method,
             data : param,
             dataType : dataType,
-            jsonpCallback : _callback
+            headers : _headers
         })
         .done(_doneCallback)
         .fail(_failCallback)
         .complete(_completeCallback);
+
         return xhr;
     }
